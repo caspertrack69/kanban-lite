@@ -2,16 +2,14 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
-import type { TaskStatus } from "@/lib/constants";
-
-export type NewTaskDefaults = {
-  status?: TaskStatus;
-  projectId?: number | null;
-};
+import { NewTaskDialog, type NewTaskDefaults } from "./new-task-dialog";
+import { TaskDetailSheet } from "./task-detail-sheet";
 
 type TaskUIValue = {
   activeTaskId: number | null;
@@ -32,20 +30,42 @@ export function useTaskUI(): TaskUIValue {
 }
 
 export function TaskUIProvider({ children }: { children: ReactNode }) {
-  const value = useMemo<TaskUIValue>(
+  const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createKey, setCreateKey] = useState(0);
+  const [createDefaults, setCreateDefaults] =
+    useState<NewTaskDefaults | undefined>(undefined);
+
+  const openTask = useCallback((id: number) => setActiveTaskId(id), []);
+  const closeTask = useCallback(() => setActiveTaskId(null), []);
+  const openCreate = useCallback((defaults?: NewTaskDefaults) => {
+    setCreateDefaults(defaults);
+    setCreateKey((current) => current + 1);
+    setCreateOpen(true);
+  }, []);
+  const closeCreate = useCallback(() => setCreateOpen(false), []);
+
+  const value = useMemo(
     () => ({
-      activeTaskId: null,
-      openTask: () => undefined,
-      closeTask: () => undefined,
-      openCreate: () => undefined,
-      closeCreate: () => undefined,
+      activeTaskId,
+      openTask,
+      closeTask,
+      openCreate,
+      closeCreate,
     }),
-    [],
+    [activeTaskId, closeCreate, closeTask, openCreate, openTask],
   );
 
   return (
     <TaskUIContext.Provider value={value}>
       {children}
+      <NewTaskDialog
+        key={createKey}
+        open={createOpen}
+        defaults={createDefaults}
+        onClose={closeCreate}
+      />
+      <TaskDetailSheet taskId={activeTaskId} onClose={closeTask} />
     </TaskUIContext.Provider>
   );
 }
