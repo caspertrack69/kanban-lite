@@ -44,6 +44,7 @@ describe("telegram parser", () => {
     expect(parseTelegramMessage("/add Website Fix header", projects)).toEqual({
       type: "unknown_project",
       attempted: "Website Fix header",
+      suggestions: ["Web Site", "Web"],
     });
   });
 
@@ -51,11 +52,49 @@ describe("telegram parser", () => {
     expect(parseTelegramMessage("/add Nope Do a thing", projects)).toEqual({
       type: "unknown_project",
       attempted: "Nope Do a thing",
+      suggestions: [],
     });
     expect(parseTelegramMessage("/list Nope", projects)).toEqual({
       type: "unknown_project",
       attempted: "Nope",
+      suggestions: [],
     });
+  });
+
+  it("resolves projects by their /projects number", () => {
+    expect(parseTelegramMessage("/add 2 Fix login", projects)).toEqual({
+      type: "add",
+      projectId: 2,
+      projectName: "Web Site",
+      title: "Fix login",
+    });
+    expect(parseTelegramMessage("/list 3", projects)).toEqual({
+      type: "list",
+      projectId: 3,
+      projectName: "Mobile App",
+    });
+    expect(parseTelegramMessage("/add 9 Fix login", projects).type).toBe(
+      "unknown_project",
+    );
+    expect(parseTelegramMessage("/list 9", projects).type).toBe(
+      "unknown_project",
+    );
+    expect(parseTelegramMessage("/add 2", projects).type).toBe("invalid");
+  });
+
+  it("falls back to a name when the leading number is out of range", () => {
+    const numbered = [
+      { id: 4, name: "2026 Roadmap" },
+      { id: 5, name: "Personal" },
+    ];
+    expect(parseTelegramMessage("/add 2026 Roadmap Fix login", numbered)).toEqual(
+      {
+        type: "add",
+        projectId: 4,
+        projectName: "2026 Roadmap",
+        title: "Fix login",
+      },
+    );
   });
 
   it("requires a title after a resolved project", () => {

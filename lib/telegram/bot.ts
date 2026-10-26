@@ -2,7 +2,6 @@ import { Bot, webhookCallback, type Context } from "grammy";
 import { ZodError } from "zod";
 import { getDb } from "@/db/client";
 import type { AppDatabase } from "@/db/client";
-import { listProjectRows } from "@/db/queries/projects";
 import { getDoingLimit } from "@/db/queries/settings";
 import {
   getTaskDetail,
@@ -17,7 +16,18 @@ import { createTask, updateTask } from "@/db/services/tasks";
 import { STATUS_LABELS } from "@/lib/constants";
 import { AppError, messageForError } from "@/lib/errors";
 import { passwordMatches } from "@/lib/password";
-import type { TaskDTO } from "@/lib/types";
+import type { ProjectDTO } from "@/lib/types";
+import {
+  code,
+  escapeHtml,
+  renderDoing,
+  renderHelp,
+  renderProjectNotFound,
+  renderProjects,
+  renderTaskList,
+  renderUnknownCommand,
+  shortTitle,
+} from "./format";
 import {
   parseTelegramMessage,
   type ParsedTelegramMessage,
@@ -30,20 +40,6 @@ type TelegramConfig = {
 };
 
 export type TelegramWebhookHandler = (request: Request) => Promise<Response>;
-
-const HELP_TEXT = [
-  "Kanban Lite commands",
-  "",
-  "Send plain text to capture it in Inbox.",
-  "/add <project> <title> — add to a project backlog",
-  "/list [project] — backlog and To Do tasks",
-  "/doing — cards currently in Doing",
-  "/move <id> <backlog|todo|doing|done> — move a task",
-  "/done <id> — complete a task or check a subtask",
-  "/projects — list projects",
-  "/newproject <name> — create a project",
-  "/help — show this message",
-].join("\n");
 
 function readConfig(): TelegramConfig {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
@@ -89,55 +85,22 @@ export function assertTelegramWebhookSecret(request: Request): void {
   }
 }
 
-function shortTitle(title: string, limit = 80): string {
-  return title.length > limit ? `${title.slice(0, limit - 1)}…` : title;
+async function replyHtml(ctx: Context, html: string): Promise<void> {
+  await ctx.reply(html, { parse_mode: "HTML" });
 }
 
-function lineForTask(task: TaskDTO, includeProject: boolean): string {
-  const status = task.status ? STATUS_LABELS[task.status] : "Task";
-  const project =
-    includeProject && task.project ? ` — ${task.project.name}` : "";
-  return `#${task.id} [${status}] ${shortTitle(task.title)}${project}`;
+function notFoundText(taskId: number): string {
+  return [
+    `<b>Task ${code(`#${taskId}`)} not found</b>`,
+    `Find ids with ${code("/list")} or ${code("/doing")}.`,
+  ].join("\n");
 }
 
-function listTaskLines(
-  tasks: TaskDTO[],
-  includeProject: boolean,
-): { lines: string[]; truncated: boolean } {
-  const lines: string[] = [];
-  let truncated = false;
-
-  for (const parent of tasks) {
-    if (lines.length >= 50) {
-      truncated = true;
-      break;
-    }
-    lines.push(lineForTask(parent, includeProject));
-
-    for (const subtask of parent.subtasks) {
-      if (lines.length >= 50) {
-        truncated = true;
-        break;
-      }
-      lines.push(
-        `   ${subtask.doneAt !== null ? "[x]" : "[ ]"} #${subtask.id} ${shortTitle(subtask.title)}`,
-      );
-    }
-
-    if (truncated) break;
-  }
-
-  return { lines, truncated };
-}
-
-async function projectListText(db: AppDatabase): Promise<string> {
-  const projects = await listProjectRows(db);
-  if (projects.length === 0) {
-    return "No projects yet. Create one with /newproject <name>.";
-  }
-  return `Projects:\n${projects
-    .map((project) => `• ${project.name} (${project.color})`)
-    .join("\n")}`;
+function subtaskLockedText(taskId: number): string {
+  return [
+    `<b>${code(`#${taskId}`)} is a subtask</b>`,
+    `Subtasks follow their parent. Check it with ${code(`/done ${taskId}`)}.`,
+  ].join("\n");
 }
 
 async function handleAdd(
@@ -150,8 +113,15 @@ async function handleAdd(
     status: "backlog",
     projectId: parsed.projectId,
   });
-  await ctx.reply(
-    `Added #${task.id} to ${parsed.projectName}: ${shortTitle(task.title)}`,
+
+  await replyHtml(
+    ctx,
+    [
+      `<b>Added to ${escapeHtml(parsed.projectName)} · Backlog</b>`,
+      `${code(`#${task.id}`)} ${escapeHtml(shortTitle(task.title))}`,
+      "",
+      `Schedule it: ${code(`/move ${task.id} todo`)}`,
+    ].join("\n"),
   );
 }
 
@@ -162,22 +132,22 @@ async function handleList(
 ): Promise<void> {
   const tasks = await listTelegramTasks(db, parsed.projectId);
   const heading = parsed.projectName
-    ? `Backlog and To Do for ${parsed.projectName}`
+    ? `Backlog and To Do — ${parsed.projectName}`
     : "Backlog and To Do";
+  const emptyHint = parsed.projectName
+    ? `Nothing here yet. Add a task: ${code(
+        `/add ${parsed.projectName} <title>`,
+      )}`
+    : `Nothing here yet. Pick a project with ${code("/projects")}.`;
 
-  if (tasks.length === 0) {
-    await ctx.reply(`${heading}: no tasks.`);
-    return;
-  }
-
-  const { lines, truncated } = listTaskLines(tasks, !parsed.projectName);
-  await ctx.reply(
-    [
-      `${heading} (${tasks.length} top-level)`,
-      "",
-      ...lines,
-      ...(truncated ? ["", "…and more. Use the web app for the full list."] : []),
-    ].join("\n"),
+  await replyHtml(
+    ctx,
+    renderTaskList({
+      heading,
+      tasks,
+      includeProject: !parsed.projectName,
+      emptyHint,
+    }),
   );
 }
 
@@ -187,23 +157,7 @@ async function handleDoing(ctx: Context, db: AppDatabase): Promise<void> {
     getDoingLimit(db),
   ]);
 
-  if (tasks.length === 0) {
-    await ctx.reply(`Doing 0/${limit}. The focus column is clear.`);
-    return;
-  }
-
-  const lines = tasks.map((task) => {
-    const project = task.project ? ` — ${task.project.name}` : "";
-    const progress =
-      task.subtasks.length > 0
-        ? ` (${task.subtasks.filter((subtask) => subtask.doneAt !== null).length}/${task.subtasks.length} subtasks)`
-        : "";
-    return `#${task.id} ${shortTitle(task.title)}${project}${progress}`;
-  });
-
-  await ctx.reply(
-    [`Doing ${tasks.length}/${limit}`, "", ...lines].join("\n"),
-  );
+  await replyHtml(ctx, renderDoing(tasks, limit));
 }
 
 async function handleMove(
@@ -211,22 +165,60 @@ async function handleMove(
   parsed: Extract<ParsedTelegramMessage, { type: "move" }>,
   db: AppDatabase,
 ): Promise<void> {
+  const current = await getTaskDetail(db, parsed.taskId);
+  if (!current) {
+    await replyHtml(ctx, notFoundText(parsed.taskId));
+    return;
+  }
+
+  if (current.parentId !== null) {
+    await replyHtml(ctx, subtaskLockedText(current.id));
+    return;
+  }
+
+  const from = current.status ? STATUS_LABELS[current.status] : "Task";
+
   try {
     const task = await updateTask(db, parsed.taskId, {
       status: parsed.status,
     });
-    await ctx.reply(
-      `Moved #${task.id} to ${STATUS_LABELS[parsed.status]}: ${shortTitle(task.title)}`,
+    await replyHtml(
+      ctx,
+      [
+        `<b>Moved ${code(`#${task.id}`)} ${from} → ${
+          STATUS_LABELS[parsed.status]
+        }</b>`,
+        escapeHtml(shortTitle(task.title)),
+      ].join("\n"),
     );
   } catch (error) {
-    if (
-      error instanceof AppError &&
-      error.code === "SUBTASK_STATUS_LOCKED"
-    ) {
-      await ctx.reply(
-        `#${parsed.taskId} is a sub-task and follows its parent. Use /done ${parsed.taskId} to check it.`,
-      );
-      return;
+    if (error instanceof AppError) {
+      if (error.code === "SUBTASK_STATUS_LOCKED") {
+        await replyHtml(ctx, subtaskLockedText(parsed.taskId));
+        return;
+      }
+      if (error.code === "DOING_LIMIT_REACHED") {
+        await replyHtml(
+          ctx,
+          [
+            `<b>${escapeHtml(error.message)}</b>`,
+            `Finish something first: ${code(
+              "/doing",
+            )} lists what is in progress.`,
+          ].join("\n"),
+        );
+        return;
+      }
+      if (error.code === "PROJECT_REQUIRED") {
+        await replyHtml(
+          ctx,
+          [
+            `<b>${code(`#${parsed.taskId}`)} has no project yet</b>`,
+            `Assign one in the web app, then move it again.`,
+          ].join("\n"),
+        );
+        return;
+      }
     }
     throw error;
   }
@@ -239,34 +231,52 @@ async function handleDone(
 ): Promise<void> {
   const task = await getTaskDetail(db, taskId);
   if (!task) {
-    await ctx.reply(`Task #${taskId} was not found.`);
+    await replyHtml(ctx, notFoundText(taskId));
     return;
   }
 
   if (task.parentId !== null) {
     if (task.doneAt !== null) {
-      await ctx.reply(`Sub-task #${task.id} is already checked.`);
+      await replyHtml(ctx, `${code(`#${task.id}`)} is already checked.`);
       return;
     }
     const checked = await updateTask(db, task.id, { completed: true });
-    await ctx.reply(`Checked #${checked.id}: ${shortTitle(checked.title)}`);
+    await replyHtml(
+      ctx,
+      [
+        `<b>Checked ${code(`#${checked.id}`)}</b>`,
+        escapeHtml(shortTitle(checked.title)),
+      ].join("\n"),
+    );
     return;
   }
 
   if (task.status === "inbox") {
-    await ctx.reply(
-      `#${task.id} is in Inbox. Assign a project in the web app before marking it done.`,
+    await replyHtml(
+      ctx,
+      [
+        `<b>${code(`#${task.id}`)} is still in Inbox</b>`,
+        "Assign a project in the web app, then complete it here.",
+      ].join("\n"),
     );
     return;
   }
 
   if (task.status === "done") {
-    await ctx.reply(`#${task.id} is already done.`);
+    await replyHtml(ctx, `${code(`#${task.id}`)} is already done.`);
     return;
   }
 
   const done = await updateTask(db, task.id, { status: "done" });
-  await ctx.reply(`Done #${done.id}: ${shortTitle(done.title)}`);
+  await replyHtml(
+    ctx,
+    [
+      `<b>Completed ${code(`#${done.id}`)}</b>`,
+      escapeHtml(shortTitle(done.title)),
+      "",
+      `Next up: ${code("/doing")}`,
+    ].join("\n"),
+  );
 }
 
 async function handleNewProject(
@@ -275,32 +285,32 @@ async function handleNewProject(
   db: AppDatabase,
 ): Promise<void> {
   const project = await createProjectWithNextColor(db, name);
-  await ctx.reply(
-    `Created project ${project.name} (${project.color}). Use /add ${project.name} <title> to add tasks.`,
+  const projects = await listProjectsService(db);
+  const index = projects.findIndex((entry) => entry.id === project.id) + 1;
+  const reference = index > 0 ? String(index) : project.name;
+
+  await replyHtml(
+    ctx,
+    [
+      `<b>Created ${escapeHtml(project.name)}</b>`,
+      "",
+      `Add the first task: ${code(`/add ${reference} Buy milk`)}`,
+    ].join("\n"),
   );
 }
 
-async function handleProjects(ctx: Context, db: AppDatabase): Promise<void> {
-  const projects = await listProjectsService(db);
-  if (projects.length === 0) {
-    await ctx.reply("No projects yet. Create one with /newproject <name>.");
-    return;
-  }
-
-  await ctx.reply(
-    `Projects:\n${projects
-      .map(
-        (project) =>
-          `• ${project.name} — ${project.color} (${project.taskCount} ${project.taskCount === 1 ? "task" : "tasks"})`,
-      )
-      .join("\n")}`,
-  );
+async function handleProjects(
+  ctx: Context,
+  projects: ProjectDTO[],
+): Promise<void> {
+  await replyHtml(ctx, renderProjects(projects));
 }
 
 async function handleParsed(
   ctx: Context,
   parsed: ParsedTelegramMessage,
   db: AppDatabase,
+  projects: ProjectDTO[],
 ): Promise<void> {
   switch (parsed.type) {
     case "inbox": {
@@ -309,7 +319,15 @@ async function handleParsed(
         note: parsed.note,
         status: "inbox",
       });
-      await ctx.reply(`Captured #${task.id} in Inbox: ${shortTitle(task.title)}`);
+      await replyHtml(
+        ctx,
+        [
+          "<b>Captured in Inbox</b>",
+          `${code(`#${task.id}`)} ${escapeHtml(shortTitle(task.title))}`,
+          "",
+          "Assign a project in the web app to put it on the board.",
+        ].join("\n"),
+      );
       return;
     }
     case "add":
@@ -328,24 +346,29 @@ async function handleParsed(
       await handleDone(ctx, parsed.taskId, db);
       return;
     case "projects":
-      await handleProjects(ctx, db);
+      await handleProjects(ctx, projects);
       return;
     case "newproject":
       await handleNewProject(ctx, parsed.name, db);
       return;
     case "unknown_project":
-      await ctx.reply(
-        `Project not found for "${shortTitle(parsed.attempted, 60)}".\n\n${await projectListText(db)}`,
+      await replyHtml(
+        ctx,
+        renderProjectNotFound(
+          parsed.attempted,
+          parsed.suggestions,
+          projects,
+        ),
       );
       return;
     case "help":
-      await ctx.reply(HELP_TEXT);
+      await replyHtml(ctx, renderHelp());
       return;
     case "unknown_command":
-      await ctx.reply(`Unknown command /${parsed.command}.\n\n${HELP_TEXT}`);
+      await replyHtml(ctx, renderUnknownCommand(parsed.command));
       return;
     case "invalid":
-      await ctx.reply(parsed.message);
+      await replyHtml(ctx, escapeHtml(parsed.message));
       return;
   }
 }
@@ -361,14 +384,16 @@ function createBot(config: TelegramConfig): Bot {
 
   bot.on("message:text", async (ctx) => {
     const { db } = await getDb();
-    const projects = await listProjectRows(db);
+    // The same ordered list drives both /projects numbering and /add parsing,
+    // so a project number always points at the project the owner just saw.
+    const projects = await listProjectsService(db);
     const parsed = parseTelegramMessage(ctx.message.text, projects);
 
     try {
-      await handleParsed(ctx, parsed, db);
+      await handleParsed(ctx, parsed, db, projects);
     } catch (error) {
       if (error instanceof AppError || error instanceof ZodError) {
-        await ctx.reply(messageForError(error));
+        await replyHtml(ctx, escapeHtml(messageForError(error)));
         return;
       }
       throw error;
@@ -389,6 +414,14 @@ function createBot(config: TelegramConfig): Bot {
 }
 
 let handlerPromise: Promise<TelegramWebhookHandler> | undefined;
+
+/**
+ * Builds a webhook-free bot instance. Used by the local long-polling script;
+ * the web app itself always goes through the webhook handler below.
+ */
+export function createTelegramBot(): Bot {
+  return createBot(readConfig());
+}
 
 export function getTelegramWebhookHandler(): Promise<TelegramWebhookHandler> {
   if (!handlerPromise) {

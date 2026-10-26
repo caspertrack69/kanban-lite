@@ -74,6 +74,7 @@ Secrets are read lazily inside request handlers, so the app can build and typech
 | `npm run db:seed` | Insert demo projects, tasks, subtasks, and settings for UI previews. |
 | `npm run design:tokens` | Regenerate `app/design-tokens.css` and `lib/design-tokens.generated.ts` from `designsystem.json`. |
 | `npm run telegram:webhook -- https://your-host` | Register the Telegram webhook. |
+| `npm run telegram:poll` | Run the bot with long polling for local testing (no public URL needed). |
 
 ## Database and migrations
 
@@ -142,19 +143,31 @@ Remove it with:
 npm run telegram:webhook -- --delete
 ```
 
+### Local testing with long polling
+
+Telegram cannot reach `localhost`, so use polling while developing:
+
+```powershell
+npm run telegram:poll
+```
+
+This connects the bot directly to Telegram, deletes any registered webhook, and drops updates queued while the bot was offline. Send commands in Telegram as usual; stop with `Ctrl+C`. Polling and a webhook cannot be active for the same bot at once, so re-register the webhook before relying on the deployed app again.
+
 Commands:
 
 | Command | Result |
 |---|---|
 | Plain text | Captured in Inbox. First line is the title; remaining lines become a note. |
-| `/add <project> <title>` | Adds to that project’s backlog using the longest project-name prefix. |
-| `/list [project]` | Backlog + To Do tasks, optionally filtered by project. Nested subtasks are indented, capped at 50 lines. |
-| `/doing` | Doing tasks with count/limit and subtask progress. |
-| `/move <id> <backlog\|todo\|doing\|done>` | Moves a top-level task. Subtasks are rejected. |
+| `/add <project> <title>` | Adds to that project’s backlog. The project can be a name prefix or the number shown by `/projects`. |
+| `/list [project\|number]` | Backlog + To Do tasks, grouped by status and filterable by project. Nested subtasks are indented; long lists are truncated with a pointer to the web app. |
+| `/doing` | Doing tasks with count/limit, remaining slots, and subtask progress. |
+| `/move <id> <backlog\|todo\|doing\|done>` | Moves a top-level task and reports the old and new status. Subtasks are rejected. |
 | `/done <id>` | Completes a parent or checks a subtask. |
-| `/projects` | Lists projects with colors and task counts. |
+| `/projects` | Lists projects as a numbered list with task counts. Those numbers work in `/add` and `/list`. |
 | `/newproject <name>` | Creates a project with the next palette color. |
-| `/help` | Command reference. |
+| `/help` | Grouped command reference. |
+
+Replies use Telegram HTML formatting, so commands and `#id` values render as tappable code. Unknown projects are answered with the closest matches plus the numbered project list.
 
 Only the owner in a private chat is processed. Requests with a bad secret token receive `401`. Task replies include the numeric `#id`.
 
