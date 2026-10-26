@@ -1,5 +1,7 @@
 # Kanban Lite
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A single-user, dark-mode Kanban for capturing ideas from Telegram and keeping only the work in front of you on the active board.
 
 - **Inbox** for raw captures.
@@ -204,3 +206,7 @@ npm run build
 - Dark theme only, matching `designsystem.json`.
 - The board data is intentionally small: Todo/Doing are cross-project, and Done shows only the last 7 days.
 - Optimistic board/list moves roll back on server errors; Doing capacity and project rules are enforced on the server.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Casper.

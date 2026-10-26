@@ -18,6 +18,7 @@
 /out/
 PRD.md
 designsystem.json
+.kilo
 
 # production
 /build
