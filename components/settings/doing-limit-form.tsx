@@ -22,17 +22,14 @@ export function DoingLimitForm({
 
   const parsed = Number(value);
   const valid = Number.isInteger(parsed) && parsed >= 1;
-  const unchanged = valid && parsed === initialLimit;
+  const changed = valid && parsed !== initialLimit;
   const belowCount = valid && parsed < doingCount;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
-    if (!valid) {
-      setError("Doing limit must be a whole number of at least 1.");
-      return;
-    }
+    if (!valid) return;
 
     updateSettings.mutate(parsed, {
       onSuccess: () => setValue(String(parsed)),
@@ -41,24 +38,26 @@ export function DoingLimitForm({
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-kl-body text-kl-text-secondary">
-          Currently in Doing:
-        </span>
-        <span className="rounded-kl-full bg-kl-raised px-3 py-1 text-kl-tag font-medium text-kl-text">
-          {formatDoingCount(doingCount, initialLimit)}
-        </span>
-      </div>
+    <form className="space-y-3" onSubmit={handleSubmit}>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              htmlFor="doing-limit"
+              className="text-kl-body font-medium text-kl-text"
+            >
+              Doing limit
+            </label>
+            <span className="rounded-kl-full bg-kl-raised px-2.5 py-0.5 text-kl-meta text-kl-text-muted">
+              {formatDoingCount(doingCount, initialLimit)} in use
+            </span>
+          </div>
+          <p className="mt-1 text-kl-meta text-kl-text-muted">
+            New cards stop entering Doing at this number.
+          </p>
+        </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div className="space-y-2">
-          <label
-            htmlFor="doing-limit"
-            className="block text-kl-meta font-medium text-kl-text-muted"
-          >
-            Doing limit
-          </label>
+        <div className="flex items-center gap-2">
           <Input
             id="doing-limit"
             type="number"
@@ -68,39 +67,39 @@ export function DoingLimitForm({
             value={value}
             onChange={(event) => setValue(event.target.value)}
             aria-invalid={!valid ? true : undefined}
-            className="w-full sm:w-36"
+            className="h-11 w-20 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={updateSettings.isPending || !changed}
+          >
+            {updateSettings.isPending ? (
+              <Loader2
+                aria-hidden="true"
+                className="size-4 animate-spin"
+                strokeWidth={1.5}
+              />
+            ) : (
+              <Save aria-hidden="true" className="size-4" strokeWidth={1.5} />
+            )}
+            Save
+          </Button>
         </div>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={updateSettings.isPending || unchanged}
-        >
-          {updateSettings.isPending ? (
-            <Loader2
-              aria-hidden="true"
-              className="size-4 animate-spin"
-              strokeWidth={1.5}
-            />
-          ) : (
-            <Save aria-hidden="true" className="size-4" strokeWidth={1.5} />
-          )}
-          Save limit
-        </Button>
       </div>
 
       {belowCount ? (
         <p className="text-kl-meta text-kl-text-muted">
-          This is below the current Doing count ({doingCount}). Existing cards
-          stay where they are; new additions will be blocked until Doing drops
-          below the new limit.
+          The {doingCount} cards already in Doing stay there. New cards remain
+          blocked until it drops below {parsed}.
         </p>
-      ) : (
-        <p className="text-kl-meta text-kl-text-muted">
-          New cards are rejected once Doing reaches this number. Lowering the
-          limit never moves existing cards.
+      ) : null}
+
+      {!valid ? (
+        <p className="text-kl-meta text-kl-danger" role="alert">
+          Use a whole number of 1 or more.
         </p>
-      )}
+      ) : null}
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
     </form>

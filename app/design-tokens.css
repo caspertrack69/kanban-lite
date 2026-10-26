@@ -94,11 +94,11 @@
   --kl-radius-xs: 4px;
   --kl-radius-sm: 8px;
   --kl-radius-md: 12px;
-  --kl-radius-card: lg (16)px;
-  --kl-radius-control: lg (16)px;
+  --kl-radius-card: 16px;
+  --kl-radius-control: 16px;
   --kl-radius-add: 10px;
-  --kl-radius-sheet: xl (24)px;
-  --kl-radius-checkbox: xs (4)px;
+  --kl-radius-sheet: 24px;
+  --kl-radius-checkbox: 4px;
   --kl-radius-full: 999px;
 
   /* Elevation and motion */

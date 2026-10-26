@@ -1,9 +1,12 @@
 "use client";
 
 import {
+  createContext,
+  useContext,
   useEffect,
   useId,
   useRef,
+  useState,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -13,6 +16,12 @@ import { Button } from "./button";
 import { IconButton } from "./icon-button";
 import { InlineAlert } from "./inline-alert";
 import { Loader2 } from "lucide-react";
+
+const DialogLayerContext = createContext<HTMLDialogElement | null>(null);
+
+export function useDialogLayer() {
+  return useContext(DialogLayerContext);
+}
 
 function useNativeDialog(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -64,71 +73,84 @@ export function Dialog({
   const titleId = useId();
   const descriptionId = useId();
   const ref = useNativeDialog(open, onClose);
+  const [dialogElement, setDialogElement] = useState<HTMLDialogElement | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setDialogElement(ref.current);
+  }, [ref]);
 
   function handleBackdrop(event: MouseEvent<HTMLDialogElement>) {
     if (event.target === event.currentTarget) onClose();
   }
 
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titleId}
-      aria-describedby={description ? descriptionId : undefined}
-      onClick={handleBackdrop}
-      className={cn(
-        "fixed z-50 text-kl-text",
-        placement === "center" &&
-          "m-auto w-[calc(100%-2rem)] max-w-lg rounded-kl-sheet border border-kl-border bg-kl-card p-0 shadow-kl-overlay",
-        placement === "right" &&
-          "inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-xl rounded-none border-l border-kl-border bg-kl-card p-0 shadow-kl-overlay sm:rounded-l-kl-sheet",
-        className,
-      )}
-    >
-      <div
+    <DialogLayerContext.Provider value={dialogElement}>
+      <dialog
+        ref={ref}
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        onClick={handleBackdrop}
         className={cn(
-          "flex w-full flex-col",
-          placement === "center" && "max-h-[min(85dvh,760px)]",
-          placement === "right" && "h-dvh",
+          "fixed z-50 text-kl-text",
+          placement === "center" &&
+            "m-auto w-[calc(100%-2rem)] max-w-lg rounded-kl-sheet border border-kl-border bg-kl-card p-0 shadow-kl-overlay",
+          placement === "right" &&
+            "inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-xl rounded-none border-l border-kl-border bg-kl-card p-0 shadow-kl-overlay sm:rounded-l-kl-sheet",
+          className,
         )}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-kl-divider px-5 py-4">
-          <div className="min-w-0">
-            <h2
-              id={titleId}
-              className="truncate text-kl-section-title text-kl-text"
-            >
-              {title}
-            </h2>
-            {description ? (
-              <p
-                id={descriptionId}
-                className="mt-1 text-kl-meta text-kl-text-muted"
-              >
-                {description}
-              </p>
-            ) : null}
-          </div>
-          <IconButton label="Close" onClick={onClose} className="-mr-2 -mt-1">
-            <X aria-hidden="true" className="size-5" strokeWidth={1.5} />
-          </IconButton>
-        </header>
-
         <div
           className={cn(
-            "kl-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-5",
-            bodyClassName,
+            "flex w-full flex-col",
+            placement === "center" && "max-h-[min(85dvh,760px)]",
+            placement === "right" && "h-dvh",
           )}
         >
-          {children}
-        </div>
+          <header className="flex items-start justify-between gap-4 border-b border-kl-divider px-5 py-4">
+            <div className="min-w-0">
+              <h2
+                id={titleId}
+                className="truncate text-kl-section-title text-kl-text"
+              >
+                {title}
+              </h2>
+              {description ? (
+                <p
+                  id={descriptionId}
+                  className="mt-1 text-kl-meta text-kl-text-muted"
+                >
+                  {description}
+                </p>
+              ) : null}
+            </div>
+            <IconButton
+              label="Close"
+              onClick={onClose}
+              className="-mr-2 -mt-1"
+            >
+              <X aria-hidden="true" className="size-5" strokeWidth={1.5} />
+            </IconButton>
+          </header>
 
-        {footer ? (
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-kl-divider px-5 py-4">
-            {footer}
-          </footer>
-        ) : null}
-      </div>
-    </dialog>
+          <div
+            className={cn(
+              "kl-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-5",
+              bodyClassName,
+            )}
+          >
+            {children}
+          </div>
+
+          {footer ? (
+            <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-kl-divider px-5 py-4">
+              {footer}
+            </footer>
+          ) : null}
+        </div>
+      </dialog>
+    </DialogLayerContext.Provider>
   );
 }
 

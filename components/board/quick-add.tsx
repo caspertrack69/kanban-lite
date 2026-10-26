@@ -5,7 +5,8 @@ import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { TextLink } from "@/components/ui/text-link";
 import type { BoardStatus } from "@/lib/constants";
 import { messageForError } from "@/lib/errors";
@@ -33,6 +34,10 @@ export function QuickAdd({
 
   const doingFull =
     status === "doing" && doingCount >= doingLimit;
+  const projectOptions = projects.map((project) => ({
+    value: String(project.id),
+    label: project.name,
+  }));
 
 
   function collapse() {
@@ -118,22 +123,12 @@ export function QuickAdd({
 
       {projects.length > 0 ? (
         <Select
-          value={projectId ?? ""}
-          onChange={(event) =>
-            setProjectId(
-              event.target.value === "" ? null : Number(event.target.value),
-            )
-          }
+          value={projectId !== null ? String(projectId) : ""}
+          options={projectOptions}
+          placeholder="Choose a project"
           aria-label="Project"
-          className="h-11"
-        >
-          <option value="">Choose a project</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </Select>
+          onValueChange={(value) => setProjectId(Number(value))}
+        />
       ) : (
         <p className="rounded-kl-control bg-kl-raised px-3 py-2 text-kl-meta text-kl-text-secondary">
           Create a project first in{" "}

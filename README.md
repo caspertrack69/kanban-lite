@@ -71,6 +71,7 @@ Secrets are read lazily inside request handlers, so the app can build and typech
 | `npm run db:migrate` | Apply pending migrations to `DATABASE_URL`. |
 | `npm run db:studio` | Open Drizzle Studio. |
 | `npm run db:backup` | Export projects, tasks, and settings to a timestamped JSON file. |
+| `npm run db:seed` | Insert demo projects, tasks, subtasks, and settings for UI previews. |
 | `npm run design:tokens` | Regenerate `app/design-tokens.css` and `lib/design-tokens.generated.ts` from `designsystem.json`. |
 | `npm run telegram:webhook -- https://your-host` | Register the Telegram webhook. |
 
@@ -106,6 +107,22 @@ The schema enforces:
 - One subtask level, enforced by services.
 - Case-insensitive unique project names.
 - Cascading project/task deletes, with explicit child deletes in services as a second line of defense.
+
+## Demo data
+
+Seed a realistic set of projects, inbox captures, board cards, backlog items, and nested subtasks:
+
+```powershell
+npm run db:seed
+```
+
+Existing rows are kept. To replace the database contents with the demo set, run:
+
+```powershell
+npm run db:seed -- --reset
+```
+
+`--reset` writes a timestamped backup to `backups/` before deleting anything. The seeder refuses to touch a non-file database unless `--allow-remote` is passed.
 
 ## Telegram bot
 

@@ -37,32 +37,21 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-2xl">
       <PageHeader
         title="Settings"
         section="Settings"
-        description="Tune the Doing limit and keep projects tidy."
-        action={
-          <Button variant="primary" onClick={openCreate}>
-            <Plus aria-hidden="true" className="size-4" strokeWidth={1.5} />
-            New project
-          </Button>
-        }
+        description="Manage focus limits, projects, and access."
       />
 
-      <div className="space-y-8">
+      <div className="space-y-10 pb-6">
         <section aria-labelledby="focus-limit-heading" className="space-y-3">
-          <div>
-            <h2
-              id="focus-limit-heading"
-              className="text-kl-section-title text-kl-text"
-            >
-              Focus limit
-            </h2>
-            <p className="mt-1 text-kl-body text-kl-text-secondary">
-              Keep the active Doing column deliberately small.
-            </p>
-          </div>
+          <h2
+            id="focus-limit-heading"
+            className="text-kl-section-title text-kl-text"
+          >
+            Focus limit
+          </h2>
 
           <div className="rounded-kl-card border border-kl-border bg-kl-card p-4 md:p-5">
             {settings.isPending ? (
@@ -105,9 +94,8 @@ export function SettingsPage() {
               >
                 Projects
               </h2>
-              <p className="mt-1 text-kl-body text-kl-text-secondary">
-                Rename, recolor, or remove projects. Deletion removes their
-                tasks.
+              <p className="mt-1 text-kl-meta text-kl-text-muted">
+                Group backlog tasks and set card colors.
               </p>
             </div>
             {projects.data && projects.data.length > 0 ? (
@@ -155,34 +143,37 @@ export function SettingsPage() {
 
         <section
           aria-labelledby="session-heading"
-          className="space-y-3 border-t border-kl-divider pt-6"
+          className="border-t border-kl-divider pt-8"
         >
-          <div>
-            <h2
-              id="session-heading"
-              className="text-kl-section-title text-kl-text"
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2
+                id="session-heading"
+                className="text-kl-section-title text-kl-text"
+              >
+                Session
+              </h2>
+              <p className="mt-1 text-kl-meta text-kl-text-muted">
+                Sign out on this device.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              disabled={logout.isPending}
+              onClick={() =>
+                logout.mutate(undefined, {
+                  onSuccess: () => router.replace("/login"),
+                })
+              }
             >
-              Session
-            </h2>
-            <p className="mt-1 text-kl-body text-kl-text-secondary">
-              Sign out of this browser. The Telegram bot stays connected to the
-              same data.
-            </p>
+              <LogOut aria-hidden="true" className="size-4" strokeWidth={1.5} />
+              {logout.isPending ? "Signing out" : "Sign out"}
+            </Button>
           </div>
-          <Button
-            variant="secondary"
-            disabled={logout.isPending}
-            onClick={() =>
-              logout.mutate(undefined, {
-                onSuccess: () => router.replace("/login"),
-              })
-            }
-          >
-            <LogOut aria-hidden="true" className="size-4" strokeWidth={1.5} />
-            {logout.isPending ? "Signing out" : "Sign out"}
-          </Button>
           {logout.isError ? (
-            <InlineAlert>{messageForError(logout.error)}</InlineAlert>
+            <InlineAlert className="mt-3">
+              {messageForError(logout.error)}
+            </InlineAlert>
           ) : null}
         </section>
       </div>

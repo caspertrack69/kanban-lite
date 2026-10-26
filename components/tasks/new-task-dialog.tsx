@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { Input, Select, Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { TextLink } from "@/components/ui/text-link";
 import { STATUS_LABELS, TASK_STATUSES, type TaskStatus } from "@/lib/constants";
 import { messageForError } from "@/lib/errors";
@@ -41,6 +42,15 @@ function NewTaskDialogContent({
 
   const effectiveProjectId = projectId ?? projects.data?.[0]?.id ?? null;
   const hasProjects = (projects.data?.length ?? 0) > 0;
+  const statusOptions = TASK_STATUSES.map((option) => ({
+    value: option,
+    label: STATUS_LABELS[option],
+    disabled: !hasProjects && option !== "inbox",
+  }));
+  const projectOptions = (projects.data ?? []).map((project) => ({
+    value: String(project.id),
+    label: project.name,
+  }));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,50 +140,34 @@ function NewTaskDialogContent({
             <Select
               id="new-task-status"
               value={status}
-              onChange={(event) => {
-                const nextStatus = event.target.value as TaskStatus;
+              options={statusOptions}
+              onValueChange={(value) => {
+                const nextStatus = value as TaskStatus;
                 setStatus(nextStatus);
                 if (nextStatus !== "inbox" && effectiveProjectId === null) {
                   setProjectId(projects.data?.[0]?.id ?? null);
                 }
               }}
-            >
-              {TASK_STATUSES.map((option) => (
-                <option
-                  key={option}
-                  value={option}
-                  disabled={!hasProjects && option !== "inbox"}
-                >
-                  {STATUS_LABELS[option]}
-                </option>
-              ))}
-            </Select>
+            />
           </Field>
 
-          <Field
-            label="Project"
-            htmlFor="new-task-project"
-            hint={status === "inbox" ? "Inbox tasks have no project yet." : undefined}
-          >
+          <Field label="Project" htmlFor="new-task-project">
             <Select
               id="new-task-project"
-              value={status === "inbox" ? "" : (effectiveProjectId ?? "")}
-              disabled={!hasProjects || status === "inbox"}
-              onChange={(event) =>
-                setProjectId(
-                  event.target.value === ""
-                    ? null
-                    : Number(event.target.value),
-                )
+              value={
+                status === "inbox"
+                  ? ""
+                  : effectiveProjectId !== null
+                    ? String(effectiveProjectId)
+                    : ""
               }
-            >
-              <option value="">No project</option>
-              {projects.data?.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </Select>
+              options={projectOptions}
+              placeholder={
+                status === "inbox" ? "No project needed" : "Select project"
+              }
+              disabled={!hasProjects || status === "inbox"}
+              onValueChange={(value) => setProjectId(Number(value))}
+            />
           </Field>
         </div>
 

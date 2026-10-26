@@ -22,7 +22,7 @@ export function ProjectList({
       <EmptyState
         icon={FolderKanban}
         title="No projects yet"
-        description="Create a project to give tasks a home and a color on the board."
+        description="Create a project to group tasks and set card colors."
         action={
           <Button variant="primary" onClick={onCreate}>
             <Plus aria-hidden="true" className="size-4" strokeWidth={1.5} />

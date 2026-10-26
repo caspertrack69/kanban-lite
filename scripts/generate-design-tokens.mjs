@@ -63,6 +63,14 @@ const fontStack = font.fallbackStack
   })
   .join(", ");
 
+const radiusPx = (value) => {
+  const match = String(value).match(/\d+(?:\.\d+)?/);
+  if (!match) {
+    throw new Error(`Cannot read a numeric radius from "${value}".`);
+  }
+  return `${match[0]}px`;
+};
+
 const desktop = scale.desktop;
 const mobile = scale.mobile;
 const pageGutter = spacing.usage.pageGutter;
@@ -163,11 +171,11 @@ const css = `/*
   --kl-radius-xs: ${radius.xs}px;
   --kl-radius-sm: ${radius.sm}px;
   --kl-radius-md: ${radius.md}px;
-  --kl-radius-card: ${radius.usage.taskCard}px;
-  --kl-radius-control: ${radius.usage.searchField}px;
+  --kl-radius-card: ${radiusPx(radius.usage.taskCard)};
+  --kl-radius-control: ${radiusPx(radius.usage.searchField)};
   --kl-radius-add: 10px;
-  --kl-radius-sheet: ${radius.usage.deviceFrameOrSheet}px;
-  --kl-radius-checkbox: ${radius.usage.checkbox}px;
+  --kl-radius-sheet: ${radiusPx(radius.usage.deviceFrameOrSheet)};
+  --kl-radius-checkbox: ${radiusPx(radius.usage.checkbox)};
   --kl-radius-full: ${radius.full}px;
 
   /* Elevation and motion */

@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog, Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { Input, Select, Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
+import { NO_SELECTION, Select } from "@/components/ui/select";
 import { ProjectChip } from "@/components/ui/tag-chip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { STATUS_LABELS, TASK_STATUSES, type TaskStatus } from "@/lib/constants";
@@ -43,6 +44,17 @@ function TaskDetailBody({
 
   const isSubtask = task.parentId !== null;
   const completed = task.doneAt !== null;
+  const projectOptions = [
+    { value: NO_SELECTION, label: "No project (Inbox)" },
+    ...(projects.data ?? []).map((project) => ({
+      value: String(project.id),
+      label: project.name,
+    })),
+  ];
+  const statusOptions = TASK_STATUSES.map((status) => ({
+    value: status,
+    label: STATUS_LABELS[status],
+  }));
 
   function saveTitle() {
     const nextTitle = title.trim();
@@ -227,32 +239,27 @@ function TaskDetailBody({
               <Field label="Project" htmlFor="task-project">
                 <Select
                   id="task-project"
-                  value={task.projectId ?? ""}
+                  value={
+                    task.projectId === null
+                      ? NO_SELECTION
+                      : String(task.projectId)
+                  }
+                  options={projectOptions}
                   disabled={projects.isPending}
-                  onChange={(event) => changeProject(event.target.value)}
-                >
-                  <option value="">No project (Inbox)</option>
-                  {projects.data?.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </Select>
+                  onValueChange={(value) =>
+                    changeProject(value === NO_SELECTION ? "" : value)
+                  }
+                />
               </Field>
               <Field label="Status" htmlFor="task-status">
                 <Select
                   id="task-status"
                   value={task.status ?? "backlog"}
-                  onChange={(event) =>
-                    changeStatus(event.target.value as TaskStatus)
+                  options={statusOptions}
+                  onValueChange={(value) =>
+                    changeStatus(value as TaskStatus)
                   }
-                >
-                  {TASK_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {STATUS_LABELS[status]}
-                    </option>
-                  ))}
-                </Select>
+                />
               </Field>
             </div>
 

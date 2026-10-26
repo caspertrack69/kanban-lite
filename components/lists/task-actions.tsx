@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { Select } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { TextLink } from "@/components/ui/text-link";
 import { messageForError } from "@/lib/errors";
 import { useProjects, useUpdateTask } from "@/lib/hooks";
@@ -18,6 +18,10 @@ export function InboxMoveAction({ task }: { task: TaskDTO }) {
   );
   const [error, setError] = useState<string | null>(null);
   const projectId = selectedProjectId ?? projects.data?.[0]?.id ?? null;
+  const projectOptions = (projects.data ?? []).map((project) => ({
+    value: String(project.id),
+    label: project.name,
+  }));
 
   if (projects.isPending) {
     return <p className="text-kl-meta text-kl-text-muted">Loading projects…</p>;
@@ -52,21 +56,12 @@ export function InboxMoveAction({ task }: { task: TaskDTO }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           <Select
-            value={projectId ?? ""}
+            value={projectId !== null ? String(projectId) : ""}
+            options={projectOptions}
+            placeholder="Select project"
             aria-label={`Project for ${task.title}`}
-            className="h-11 text-kl-meta"
-            onChange={(event) =>
-              setSelectedProjectId(
-                event.target.value === "" ? null : Number(event.target.value),
-              )
-            }
-          >
-            {projects.data.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
+            onValueChange={(value) => setSelectedProjectId(Number(value))}
+          />
         </div>
         <Button
           disabled={projectId === null || updateTask.isPending}

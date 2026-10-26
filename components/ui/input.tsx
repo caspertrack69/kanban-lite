@@ -1,8 +1,7 @@
 import type { ComponentProps } from "react";
-import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-const fieldBase =
+export const fieldBase =
   "w-full rounded-kl-control border border-transparent bg-kl-raised text-kl-text outline-none transition-colors duration-[var(--kl-duration-fast)] placeholder:text-kl-text-disabled hover:bg-white/[0.06] focus-visible:border-kl-accent aria-[invalid=true]:border-kl-danger disabled:cursor-not-allowed disabled:opacity-55";
 
 export function Input({
@@ -42,31 +41,5 @@ export function Textarea({
       )}
       {...props}
     />
-  );
-}
-
-export function Select({
-  className,
-  children,
-  ...props
-}: ComponentProps<"select">) {
-  return (
-    <div className="relative w-full">
-      <select
-        className={cn(
-          fieldBase,
-          "h-11 appearance-none px-3.5 pr-10 text-kl-body",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        aria-hidden="true"
-        className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-kl-text-muted"
-        strokeWidth={1.5}
-      />
-    </div>
   );
 }
